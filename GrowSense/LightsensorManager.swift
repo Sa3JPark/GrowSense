@@ -19,26 +19,41 @@ class LightSensorManager: NSObject, ObservableObject, AVCaptureVideoDataOutputSa
         setupCamera()
     }
     
-    private func setupCamera() {
-        guard let captureDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
-            print("No camera available")
+    private var currentPosition: AVCaptureDevice.Position = .front
+
+    func setupCamera() {
+        captureSession.beginConfiguration()
+        captureSession.inputs.forEach { captureSession.removeInput($0) }
+        captureSession.outputs.forEach { captureSession.removeOutput($0) }
+        
+        guard let captureDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: currentPosition) else {
+            print("No \(currentPosition == .front ? "front" : "back") camera available")
+            captureSession.commitConfiguration()
             return
         }
         self.device = captureDevice
-        
+
         do {
             let input = try AVCaptureDeviceInput(device: captureDevice)
             captureSession.addInput(input)
-            
+
             let output = AVCaptureVideoDataOutput()
             output.setSampleBufferDelegate(self, queue: DispatchQueue(label: "videoQueue"))
             captureSession.addOutput(output)
-            
+
+            captureSession.commitConfiguration()
             captureSession.startRunning()
         } catch {
             print("Error setting up camera: \(error)")
+            captureSession.commitConfiguration()
         }
     }
+
+    func switchCamera() {
+        currentPosition = (currentPosition == .back) ? .front : .back
+        setupCamera()
+    }
+
     
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         guard let device = device else { return }
